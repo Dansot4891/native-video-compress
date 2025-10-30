@@ -1,6 +1,6 @@
-# native_video_compress_example
+# example
 
-Demonstrates how to use the native_video_compress plugin.
+A new Flutter project.
 
 ## Getting Started
 
