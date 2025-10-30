@@ -7,9 +7,7 @@ import 'package:native_video_compress/enum/video_setting.dart';
 import 'package:path_provider/path_provider.dart';
 
 abstract class NativeVideoController {
-  static const MethodChannel _channel = MethodChannel(
-    'native_video_compressor',
-  );
+  static const MethodChannel _channel = MethodChannel('native_video_compress');
 
   /// 비디오 압축
   ///
