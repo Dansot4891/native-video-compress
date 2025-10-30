@@ -5,7 +5,6 @@ import 'package:video_player/video_player.dart';
 abstract class VideoInfoController {
   /// Print video size and resolution
   static Future<void> printVideoInfo(String path) async {
-    debugPrint('printVideoInfo: $path');
     final file = File(path);
 
     if (!await file.exists()) {
@@ -14,7 +13,7 @@ abstract class VideoInfoController {
     }
 
     final size = await file.length();
-    debugPrint('📏 파일 크기: ${(size / 1024 / 1024).toStringAsFixed(2)} MB');
+    debugPrint('📏 File size: ${(size / 1024 / 1024).toStringAsFixed(2)} MB');
 
     final controller = VideoPlayerController.file(file);
     try {

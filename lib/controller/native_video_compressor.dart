@@ -58,7 +58,7 @@ abstract class NativeVideoController {
       await VideoInfoController.printVideoInfo(outputPath);
       return outputPath;
     } on PlatformException catch (e) {
-      debugPrint('Failed to compress video: ${e.message}');
+      debugPrint('Failed to compress video: $e');
       return null;
     }
   }

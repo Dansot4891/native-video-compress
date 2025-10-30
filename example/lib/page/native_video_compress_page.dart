@@ -54,6 +54,7 @@ class _NativeVideoCompressPageState extends State<NativeVideoCompressPage> {
                 onPressed: () async {
                   final result = await NativeVideoController.compressVideo(
                     inputPath: path!,
+                    bitrate: 5000000,
                   );
                   setState(() {
                     outputPath = result;
