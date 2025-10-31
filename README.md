@@ -31,6 +31,22 @@ dependencies:
 
 No additional platform setup is required. Note that H.265 (HEVC) encoding requires device/OS support.
 
+### Android Setup (NDK version)
+Some Android environments require an explicit NDK version to build Media3/Transformer properly. If you encounter NDK/transformer build errors, set the NDK version in your app module's Gradle (Kotlin DSL):
+
+```kotlin
+// android/app/build.gradle.kts
+android {
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = "27.0.12077973"
+    // ...
+}
+```
+
+Notes:
+- This plugin already sets `ndkVersion = "27.0.12077973"` in its own library module. Some projects still need the app module to match it explicitly.
+- Ensure your Android Gradle Plugin and Gradle wrapper are up-to-date, or align the NDK version as above if builds fail.
+
 ### Quick Start
 ```dart
 import 'package:native_video_compress/controller/native_video_compressor.dart';
