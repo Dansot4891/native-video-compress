@@ -30,6 +30,10 @@ class NativeVideoCompressPlugin : FlutterPlugin, MethodCallHandler {
         context = flutterPluginBinding.applicationContext
     }
 
+    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        channel.setMethodCallHandler(null)
+    }
+
     override fun onMethodCall(call: MethodCall, result: Result) {
         when (call.method) {
             "compressVideo" -> {
@@ -70,10 +74,6 @@ class NativeVideoCompressPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        channel.setMethodCallHandler(null)
-    }
-
     private fun compressVideo(
         inputPath: String,
         outputPath: String,
@@ -87,16 +87,46 @@ class NativeVideoCompressPlugin : FlutterPlugin, MethodCallHandler {
         audioChannels: Int,
         result: Result
     ) {
-        Log.d("VideoCompress", "========== 압축 시작 ==========")
+        Log.d("VideoCompress", "========== Compress Start ==========")
         Log.d("VideoCompress", "Input: $inputPath")
         Log.d("VideoCompress", "Output: $outputPath")
-        Log.d("VideoCompress", "Target Video Bitrate: ${targetBitrate / 1000}kbps")
-        Log.d("VideoCompress", "Target Resolution: ${width ?: "원본"}x${height ?: "원본"}")
 
         try {
             val outputFile = File(outputPath)
             if (outputFile.exists()) {
                 outputFile.delete()
+            }
+
+            // 원본 비디오 정보 가져오기
+            val retriever = android.media.MediaMetadataRetriever()
+            retriever.setDataSource(inputPath)
+            val originalWidth = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 1280
+            val originalHeight = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 720
+            val originalBitrate = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_BITRATE)?.toIntOrNull() ?: targetBitrate
+            retriever.release()
+
+            Log.d("VideoCompress", "📹 Original Size: ${originalWidth}x${originalHeight}, ${originalBitrate / 1000}kbps")
+
+            // 해상도 결정 - 사용자 지정이 없으면 원본 유지
+            val finalWidth: Int
+            val finalHeight: Int
+            
+            if (width != null && height != null) {
+                // 사용자가 명시적으로 해상도 지정
+                finalWidth = roundTo16(width)
+                finalHeight = roundTo16(height)
+                Log.d("VideoCompress", "🎯 Custom Resolution: ${finalWidth}x${finalHeight}")
+            } else {
+                // 해상도 지정 없으면 원본 그대로
+                finalWidth = roundTo16(originalWidth)
+                finalHeight = roundTo16(originalHeight)
+                Log.d("VideoCompress", "🎯 Original resolution: ${finalWidth}x${finalHeight}")
+            }
+
+            // 비트레이트가 원본보다 낮은데 해상도는 그대로면 경고
+            if (targetBitrate < originalBitrate && width == null && height == null) {
+                Log.w("VideoCompress", "⚠️ The resolution remains the same, but only the beat rate is lowered → Compression effects may be limited ⚠️")
+                Log.w("VideoCompress", "💡 If you want a smaller file, set width/height together")
             }
 
             val videoMimeType = when (videoCodec.lowercase()) {
@@ -109,45 +139,27 @@ class NativeVideoCompressPlugin : FlutterPlugin, MethodCallHandler {
                 else -> MimeTypes.AUDIO_AAC
             }
 
-            // 비디오 인코더 설정 - 더 강력하게
             val videoEncoderSettings = VideoEncoderSettings.Builder()
                 .setBitrate(targetBitrate)
                 .build()
 
-            Log.d("VideoCompress", "✅ VideoEncoderSettings: bitrate=${targetBitrate}")
-
             val encoderFactory = DefaultEncoderFactory.Builder(context)
                 .setRequestedVideoEncoderSettings(videoEncoderSettings)
-                .setEnableFallback(false) // 폴백 비활성화 - 강제로 설정 적용
+                .setEnableFallback(false)
                 .build()
 
             val mediaItem = MediaItem.fromUri(inputPath)
 
-            // 해상도가 지정되지 않으면 원본의 80%로 축소
-            val effects = if (width != null && height != null) {
-                Effects(
-                    emptyList(),
-                    listOf(
-                        Presentation.createForWidthAndHeight(
-                            width,
-                            height,
-                            Presentation.LAYOUT_SCALE_TO_FIT
-                        )
+            val effects = Effects(
+                emptyList(),
+                listOf(
+                    Presentation.createForWidthAndHeight(
+                        finalWidth,
+                        finalHeight,
+                        Presentation.LAYOUT_SCALE_TO_FIT
                     )
                 )
-            } else {
-                // 해상도 지정 안하면 기본적으로 축소
-                Effects(
-                    emptyList(),
-                    listOf(
-                        Presentation.createForWidthAndHeight(
-                            1280,
-                            720,
-                            Presentation.LAYOUT_SCALE_TO_FIT
-                        )
-                    )
-                )
-            }
+            )
 
             val editedMediaItem = EditedMediaItem.Builder(mediaItem)
                 .setEffects(effects)
@@ -160,22 +172,32 @@ class NativeVideoCompressPlugin : FlutterPlugin, MethodCallHandler {
                 .addListener(object : Transformer.Listener {
                     override fun onCompleted(composition: Composition, exportResult: ExportResult) {
                         val inputSize = File(inputPath).length()
-                        val outputSize = exportResult.fileSizeBytes
-                        val compressionRatio = ((inputSize - outputSize).toFloat() / inputSize * 100)
+                        val outputSize = File(outputPath).length()
                         
-                        Log.d("VideoCompress", "========== 압축 완료! ==========")
-                        Log.d("VideoCompress", "⏱ Duration: ${exportResult.durationMs}ms")
-                        Log.d("VideoCompress", "📦 Input size: ${inputSize / 1024 / 1024}MB")
-                        Log.d("VideoCompress", "📦 Output size: ${outputSize / 1024 / 1024}MB")
-                        Log.d("VideoCompress", "📊 Compression: ${compressionRatio.toInt()}%")
-                        Log.d("VideoCompress", "📊 Target bitrate: ${targetBitrate / 1000}kbps")
-                        Log.d("VideoCompress", "📊 Actual video bitrate: ${exportResult.averageVideoBitrate / 1000}kbps")
-                        Log.d("VideoCompress", "🎵 Actual audio bitrate: ${exportResult.averageAudioBitrate / 1000}kbps")
-                        
-                        // 비트레이트가 제대로 적용되었는지 확인
-                        if (exportResult.averageVideoBitrate > targetBitrate * 1.2) {
-                            Log.w("VideoCompress", "⚠️ 실제 비트레이트가 목표보다 높습니다!")
+                        // 압축했는데 원본보다 크면 원본 사용
+                        if (outputSize >= inputSize) {
+                            Log.w("VideoCompress", "⚠️ Files get bigger after compression → Using the Original Source ⚠️")
+                            
+                            // 압축된 파일 삭제
+                            File(outputPath).delete()
+                            
+                            // 원본을 출력 경로로 복사
+                            File(inputPath).copyTo(File(outputPath), overwrite = true)
+                            
+                            result.success(outputPath)
+                            return
                         }
+                        
+                        val compressionRatio = ((inputSize - outputSize).toFloat() / inputSize * 100)
+                        val inputSizeMB = String.format("%.2f", inputSize / 1024.0 / 1024.0)
+                        val outputSizeMB = String.format("%.2f", outputSize / 1024.0 / 1024.0)
+                        
+                        Log.d("VideoCompress", "========== Compress Complete! ==========")
+                        Log.d("VideoCompress", "⏱ Duration: ${exportResult.durationMs}ms")
+                        Log.d("VideoCompress", "📏 Input size: $inputSizeMB MB")
+                        Log.d("VideoCompress", "📏 Output size: $outputSizeMB MB")
+                        Log.d("VideoCompress", "📊 Compression: ${compressionRatio.toInt()}%")
+                        Log.d("VideoCompress", "📐 Output resolution: ${finalWidth}x${finalHeight}")
                         
                         result.success(outputPath)
                     }
@@ -195,12 +217,17 @@ class NativeVideoCompressPlugin : FlutterPlugin, MethodCallHandler {
                 })
                 .build()
 
-            Log.d("VideoCompress", "🚀 Transformer 시작...")
+            Log.d("VideoCompress", "🚀 Transformer Start...")
             transformer.start(editedMediaItem, outputPath)
 
         } catch (e: Exception) {
             Log.e("VideoCompress", "❌ 압축 설정 실패", e)
             result.error("COMPRESSION_ERROR", e.message ?: "Unknown error", e.toString())
         }
+    }
+
+    // 16의 배수로 반올림하는 함수
+    private fun roundTo16(value: Int): Int {
+        return (value + 8) / 16 * 16
     }
 }

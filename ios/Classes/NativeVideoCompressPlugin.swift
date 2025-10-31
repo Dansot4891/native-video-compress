@@ -97,7 +97,7 @@ public class NativeVideoCompressPlugin: NSObject, FlutterPlugin {
         let finalWidth = width ?? originalWidth
         let finalHeight = height ?? originalHeight
         
-        print("📹 비디오 크기 - 원본: \(originalWidth)x\(originalHeight), 출력: \(finalWidth)x\(finalHeight)")
+        print("📹 Video Size - Original: \(originalWidth)x\(originalHeight), Output: \(finalWidth)x\(finalHeight)")
 
         do {
             let reader = try AVAssetReader(asset: asset)

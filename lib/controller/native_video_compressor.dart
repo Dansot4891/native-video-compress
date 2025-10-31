@@ -21,6 +21,7 @@ abstract class NativeVideoController {
   /// [audioBitrate] : Audio bitrate (e.g. 128000 = 128kbps), default: 128000
   /// [audioSampleRate] : Audio sample rate (e.g. 44100), default: 44100
   /// [audioChannels] : Audio channels (1=mono, 2=stereo), default: 2
+  /// [printingInfo] : Print video info, default: false
   static Future<String?> compressVideo({
     required String inputPath,
     int bitrate = 2000000,
@@ -31,12 +32,15 @@ abstract class NativeVideoController {
     int audioBitrate = 128000,
     int audioSampleRate = 44100,
     int audioChannels = 2,
+    bool printingInfo = false,
   }) async {
     try {
       debugPrint(
         '-------------------------------- Before compress video info --------------------------------',
       );
-      await VideoInfoController.printVideoInfo(inputPath);
+      if (printingInfo) {
+        await VideoInfoController.printVideoInfo(inputPath);
+      }
       // 출력 경로 생성
       final dir = await getTemporaryDirectory();
       final outputPath = '${dir.path}/$outputFileName';
@@ -55,7 +59,9 @@ abstract class NativeVideoController {
       debugPrint(
         '-------------------------------- After compress video info --------------------------------',
       );
-      await VideoInfoController.printVideoInfo(outputPath);
+      if (printingInfo) {
+        await VideoInfoController.printVideoInfo(outputPath);
+      }
       return outputPath;
     } on PlatformException catch (e) {
       debugPrint('Failed to compress video: $e');
@@ -75,4 +81,9 @@ abstract class NativeVideoController {
 
   /// File name
   static String get outputFileName => 'compressed.mp4';
+
+  /// Set output file name
+  static set outputFileName(String inputFileName) {
+    outputFileName = inputFileName;
+  }
 }
