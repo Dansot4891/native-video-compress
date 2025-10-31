@@ -1,3 +1,11 @@
 ## 0.0.1
-
-* TODO: Describe initial release.
+- Initial release
+- Video compression using native encoders on iOS/Android
+- Video codecs: `h264`, `h265`/`hevc`
+- Audio codecs: `aac`, `alac` (lossless), `mp3`
+- Supports bitrate and resolution (`width`, `height`); defaults to original when omitted
+- Supports audio bitrate/sample rate/channels
+- Optional info logging (size/resolution/duration) before and after compression
+- Outputs to temporary directory; provides cache clearing Function
+- Android: Media3 Transformer, rounds resolution to multiples of 16, returns original if compressed file is larger
+- iOS: AVAssetReader/Writer, handles rotation via preferred transform

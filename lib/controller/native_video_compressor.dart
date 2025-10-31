@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:native_video_compress/controller/video_info_controller.dart';
 import 'package:native_video_compress/enum/audio_setting.dart';
 import 'package:native_video_compress/enum/video_setting.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:video_player/video_player.dart';
 
 abstract class NativeVideoController {
   static const MethodChannel _channel = MethodChannel('native_video_compress');
@@ -35,13 +35,14 @@ abstract class NativeVideoController {
     bool printingInfo = false,
   }) async {
     try {
-      debugPrint(
-        '-------------------------------- Before compress video info --------------------------------',
-      );
       if (printingInfo) {
-        await VideoInfoController.printVideoInfo(inputPath);
+        debugPrint(
+          '-------------------------------- Before compress video info --------------------------------',
+        );
+        await printVideoInfo(inputPath);
       }
-      // 출력 경로 생성
+
+      /// Output path creation
       final dir = await getTemporaryDirectory();
       final outputPath = '${dir.path}/$outputFileName';
       await _channel.invokeMethod('compressVideo', {
@@ -56,11 +57,11 @@ abstract class NativeVideoController {
         'audioSampleRate': audioSampleRate,
         'audioChannels': audioChannels,
       });
-      debugPrint(
-        '-------------------------------- After compress video info --------------------------------',
-      );
       if (printingInfo) {
-        await VideoInfoController.printVideoInfo(outputPath);
+        debugPrint(
+          '-------------------------------- After compress video info --------------------------------',
+        );
+        await printVideoInfo(outputPath);
       }
       return outputPath;
     } on PlatformException catch (e) {
@@ -85,5 +86,34 @@ abstract class NativeVideoController {
   /// Set output file name
   static set outputFileName(String inputFileName) {
     outputFileName = inputFileName;
+  }
+
+  /// Print video size and resolution
+  static Future<void> printVideoInfo(String path) async {
+    final file = File(path);
+
+    if (!await file.exists()) {
+      debugPrint('⚠️ File not found: $path');
+      return;
+    }
+
+    final size = await file.length();
+    debugPrint('📏 File size: ${(size / 1024 / 1024).toStringAsFixed(2)} MB');
+
+    final controller = VideoPlayerController.file(file);
+    try {
+      await controller.initialize();
+
+      final width = controller.value.size.width;
+      final height = controller.value.size.height;
+      final duration = controller.value.duration;
+
+      debugPrint('📐 Resolution: ${width.toInt()}x${height.toInt()}');
+      debugPrint('⏱ Video duration: ${duration.inSeconds}s');
+    } catch (e) {
+      debugPrint('❌ Failed to read video info: $e');
+    } finally {
+      await controller.dispose();
+    }
   }
 }
