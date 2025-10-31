@@ -1,5 +1,5 @@
 name: native_video_compress
-description: "A new Flutter plugin project."
+description: "A Flutter plugin for native video compression on iOS and Android."
 version: 0.0.1
 homepage:
 
@@ -28,3 +28,5 @@ flutter:
         pluginClass: NativeVideoCompressPlugin
       ios:
         pluginClass: NativeVideoCompressPlugin
+
+license: MIT
