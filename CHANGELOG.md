@@ -13,3 +13,6 @@
 
 ## 0.0.2
 - Write READEME.md => Supported platforms: Android and iOS only
+
+## 0.0.3
+- Implementing by integrating example code into the main.dart
