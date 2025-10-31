@@ -9,7 +9,7 @@ import 'package:video_player/video_player.dart';
 abstract class NativeVideoController {
   static const MethodChannel _channel = MethodChannel('native_video_compress');
 
-  /// 비디오 압축
+  /// Compress video
   ///
   /// [inputPath] : Input video path
   /// [outputPath] : Output video path
