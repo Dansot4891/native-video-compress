@@ -4,6 +4,20 @@ A Flutter plugin that compresses video files using native encoders on iOS and An
 
 ---
 
+## Example ScreenShot
+
+# 📸 Preview
+<img width=30% src='https://github.com/Dansot4891/native-video-compress/raw/main/screenshots/video_ex.gif'>
+
+<img src='https://github.com/Dansot4891/native-video-compress/raw/main/screenshots/printing.png'>
+
+---
+
+## ‼️ Caution
+#### It takes time for each Android/IOS to compress the video, so you have to wait for it to be compressed. The UI/UX component in that area should be implemented freely.
+
+---
+
 ## ⭐️ Features
 - **Target bitrate**: reduce file size by setting an average video bitrate
 - **Resize**: specify output `width`/`height` (defaults to original if omitted)
@@ -78,7 +92,7 @@ final output = await NativeVideoController.compressVideo(
 await NativeVideoController.clearCache();
 ```
 
-### Priniting Info
+### Printing Info
 ``` dart
 await NativeVideoController.printVideoInfo("/path/to/input.mp4");
 ```
@@ -86,17 +100,20 @@ await NativeVideoController.printVideoInfo("/path/to/input.mp4");
 ---
 
 ## 🧩 Parameters
-[inputPath] : Input video path
-[outputPath] : Output video path
-[bitrate] : Video bitrate (e.g. 2000000 = 2Mbps)
-[width] : Output video width (Nullable)
-[height] : Output video height (Nullable)
-[videoCodec] : Video codec ("h264" or "h265"/"hevc"), default: "h264"
-[audioCodec] : Audio codec ("aac", "alac", "mp3"), default: "aac"
-[audioBitrate] : Audio bitrate (e.g. 128000 = 128kbps), default: 128000
-[audioSampleRate] : Audio sample rate (e.g. 44100), default: 44100
-[audioChannels] : Audio channels (1=mono, 2=stereo), default: 2
-[printingInfo] : Print video info, default: false
+
+| Parameter      | Type          | Default        | Description |
+| -------------- | ------------- | -------------- | ----------- |
+| inputPath      | String        | —              | Input video path (required). |
+| bitrate        | int           | 2,000,000      | Average video bitrate in bps. |
+| width          | int?          | null           | Output width; keeps original if null. |
+| height         | int?          | null           | Output height; keeps original if null. |
+| videoSetting   | VideoSetting  | h264           | Video codec. Allowed: h264, h265, hevc. |
+| audioSetting   | AudioSetting  | aac            | Audio codec. Allowed: aac (lossy), alac (lossless), mp3 (lossy). |
+| audioBitrate   | int           | 128,000        | Audio bitrate in bps. |
+| audioSampleRate| int           | 44,100         | Audio sample rate in Hz. |
+| audioChannels  | int           | 2              | Number of channels (1=mono, 2=stereo). |
+| printingInfo   | bool          | false          | Print size/resolution/duration before/after. |
+| outputPath     | String        | temp/compressed.mp4 | Auto-generated in temporary directory; not a function parameter, returned path may be copied/moved as needed. |
 
 ### Enums
 ```dart
@@ -120,7 +137,7 @@ await NativeVideoController.clearCache();
 ---
 
 ## Platform Notes
-- **Androi**
+- **Android**
   - If the compressed file becomes larger than the input, the plugin returns the original by copying it to the output path.
   - Resolution is rounded to a multiple of 16 internally (encoder constraints).
   - `h265`/`hevc` requires a supported device encoder; otherwise it may fail.
