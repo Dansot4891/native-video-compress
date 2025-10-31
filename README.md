@@ -57,9 +57,13 @@ if (output != null) {
 await NativeVideoController.clearCache();
 ```
 
+> Note: The output lives in the temporary directory. If you need to keep it, move/copy it to your app storage. If you don't need it anymore, call the cache clearing Function to remove it.
+
 ### API Reference
 
-#### `NativeVideoController.compressVideo({...}) -> Future<String?>`
+#### Compression
+
+`NativeVideoController.compressVideo({...}) -> Future<String?>`
 - **inputPath (required)**: source video path
 - **bitrate (default: 2_000_000)**: average video bitrate in bps
 - **width / height (optional)**: output resolution; defaults to original if omitted
@@ -78,13 +82,45 @@ await NativeVideoController.clearCache();
 
 Returns the output file path on success, or `null` on failure.
 
-The output file is written to the temporary directory as `compressed.mp4` and will be overwritten on subsequent runs.
+Output is written to the temporary directory as `compressed.mp4` and is overwritten on subsequent runs.
 
-#### `NativeVideoController.clearCache() -> Future<void>`
-Deletes the `compressed.mp4` file from the temporary directory.
+Example:
+```dart
+final out = await NativeVideoController.compressVideo(
+  inputPath: path,
+  bitrate: 2_000_000,
+  width: 1280,
+  height: 720,
+  videoSetting: VideoSetting.h264,
+  audioSetting: AudioSetting.aac,
+  printingInfo: true,
+);
+```
 
-#### `NativeVideoController.printVideoInfo(path) -> Future<void>`
-Logs file size (MB), resolution, and duration.
+#### Video Info
+
+`NativeVideoController.printVideoInfo(path) -> Future<void>`
+- Prints file size (MB), resolution, and duration to the log.
+- Useful for debugging quality/size trade-offs before and after compression.
+
+Example:
+```dart
+await NativeVideoController.printVideoInfo(inputPath);
+// ... run compression ...
+await NativeVideoController.printVideoInfo(outputPath);
+```
+
+#### Cache Management
+
+`NativeVideoController.clearCache() -> Future<void>`
+- Deletes the `compressed.mp4` from the temporary directory.
+- Call this after you copy/move the output to a permanent location, or when the compressed file is no longer needed.
+
+Example:
+```dart
+// If you don't need the temporary output anymore
+await NativeVideoController.clearCache();
+```
 
 ### Enums
 ```dart
@@ -108,6 +144,10 @@ enum AudioSetting { aac('aac', false), alac('alac', true), mp3('mp3', false) }
 See the `example/` project in this repository.
 - Page: `example/lib/page/native_video_compress_page.dart`
 - Player widget: `example/lib/component/video_file_widget.dart`
+
+Notes:
+- The example uses `image_picker` purely to demonstrate selecting a video file. The plugin itself does not depend on it.
+- Typical workflow: pick a video (any method) → compress → use or move the output → run the cache clearing Function if the temporary file is no longer needed.
 
 ```dart
 // Simplified usage (from the example app)
