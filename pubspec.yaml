@@ -1,7 +1,7 @@
 name: native_video_compress
 description: "A Flutter plugin for native video compression on iOS and Android."
 version: 0.0.1
-homepage:
+homepage: https://github.com/Dansot4891/native-video-compress
 
 environment:
   sdk: ^3.8.1
