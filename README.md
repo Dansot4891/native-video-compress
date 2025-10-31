@@ -18,6 +18,14 @@ A Flutter plugin that compresses video files using native encoders on iOS and An
 
 ---
 
+## 🧭 Supported Platforms
+- Android
+- iOS
+
+Not supported: Web, macOS, Windows, Linux.
+
+---
+
 ## ⭐️ Features
 - **Target bitrate**: reduce file size by setting an average video bitrate
 - **Resize**: specify output `width`/`height` (defaults to original if omitted)

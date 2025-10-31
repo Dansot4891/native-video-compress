@@ -9,3 +9,7 @@
 - Outputs to temporary directory; provides cache clearing Function
 - Android: Media3 Transformer, rounds resolution to multiples of 16, returns original if compressed file is larger
 - iOS: AVAssetReader/Writer, handles rotation via preferred transform
+
+
+## 0.0.2
+- Write READEME.md => Supported platforms: Android and iOS only
