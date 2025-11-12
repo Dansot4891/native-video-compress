@@ -9,6 +9,25 @@ import 'package:video_player/video_player.dart';
 abstract class NativeVideoController {
   static const MethodChannel _channel = MethodChannel('native_video_compress');
 
+  // Progress callback storage
+  static Function(double)? _currentProgressCallback;
+  static bool _handlerSetup = false;
+
+  /// Setup method call handler for progress callbacks from native
+  static void _setupProgressHandler() {
+    if (_handlerSetup) return;
+
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'onProgress') {
+        final progress = call.arguments['progress'] as int;
+        // Convert 0-100 to 0.0-1.0
+        _currentProgressCallback?.call(progress / 100.0);
+      }
+    });
+
+    _handlerSetup = true;
+  }
+
   /// Compress video
   ///
   /// [inputPath] : Input video path
@@ -22,6 +41,7 @@ abstract class NativeVideoController {
   /// [audioSampleRate] : Audio sample rate (e.g. 44100), default: 44100
   /// [audioChannels] : Audio channels (1=mono, 2=stereo), default: 2
   /// [printingInfo] : Print video info, default: false
+  /// [onProgress] : Progress callback (0.0 - 1.0), NEW parameter
   static Future<String?> compressVideo({
     required String inputPath,
     int bitrate = 2000000,
@@ -33,8 +53,13 @@ abstract class NativeVideoController {
     int audioSampleRate = 44100,
     int audioChannels = 2,
     bool printingInfo = false,
+    Function(double progress)? onProgress,
   }) async {
     try {
+      // Setup progress handler
+      _setupProgressHandler();
+      _currentProgressCallback = onProgress;
+
       if (printingInfo) {
         debugPrint(
           '-------------------------------- Before compress video info --------------------------------',
@@ -67,6 +92,9 @@ abstract class NativeVideoController {
     } on PlatformException catch (e) {
       debugPrint('Failed to compress video: $e');
       return null;
+    } finally {
+      // Clean up callback reference to prevent memory leaks
+      _currentProgressCallback = null;
     }
   }
 

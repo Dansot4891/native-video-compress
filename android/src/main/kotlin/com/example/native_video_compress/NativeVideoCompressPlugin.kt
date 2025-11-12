@@ -1,6 +1,8 @@
 package com.example.native_video_compress
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -11,6 +13,7 @@ import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.Effects
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
+import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.VideoEncoderSettings
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -110,7 +113,7 @@ class NativeVideoCompressPlugin : FlutterPlugin, MethodCallHandler {
             // 해상도 결정 - 사용자 지정이 없으면 원본 유지
             val finalWidth: Int
             val finalHeight: Int
-            
+
             if (width != null && height != null) {
                 // 사용자가 명시적으로 해상도 지정
                 finalWidth = roundTo16(width)
@@ -165,40 +168,51 @@ class NativeVideoCompressPlugin : FlutterPlugin, MethodCallHandler {
                 .setEffects(effects)
                 .build()
 
+            // Progress tracking setup
+            val progressHolder = ProgressHolder()
+            val progressHandler = Handler(Looper.getMainLooper())
+            var progressRunnable: Runnable? = null
+
             val transformer = Transformer.Builder(context)
                 .setVideoMimeType(videoMimeType)
                 .setAudioMimeType(audioMimeType)
                 .setEncoderFactory(encoderFactory)
                 .addListener(object : Transformer.Listener {
                     override fun onCompleted(composition: Composition, exportResult: ExportResult) {
+                        // Stop progress polling
+                        progressRunnable?.let { progressHandler.removeCallbacks(it) }
+
+                        // Send 100% progress
+                        sendProgressToFlutter(100)
+
                         val inputSize = File(inputPath).length()
                         val outputSize = File(outputPath).length()
-                        
+
                         // 압축했는데 원본보다 크면 원본 사용
                         if (outputSize >= inputSize) {
                             Log.w("VideoCompress", "⚠️ Files get bigger after compression → Using the Original Source ⚠️")
-                            
+
                             // 압축된 파일 삭제
                             File(outputPath).delete()
-                            
+
                             // 원본을 출력 경로로 복사
                             File(inputPath).copyTo(File(outputPath), overwrite = true)
-                            
+
                             result.success(outputPath)
                             return
                         }
-                        
+
                         val compressionRatio = ((inputSize - outputSize).toFloat() / inputSize * 100)
                         val inputSizeMB = String.format("%.2f", inputSize / 1024.0 / 1024.0)
                         val outputSizeMB = String.format("%.2f", outputSize / 1024.0 / 1024.0)
-                        
+
                         Log.d("VideoCompress", "========== Compress Complete! ==========")
                         Log.d("VideoCompress", "⏱ Duration: ${exportResult.durationMs}ms")
                         Log.d("VideoCompress", "📏 Input size: $inputSizeMB MB")
                         Log.d("VideoCompress", "📏 Output size: $outputSizeMB MB")
                         Log.d("VideoCompress", "📊 Compression: ${compressionRatio.toInt()}%")
                         Log.d("VideoCompress", "📐 Output resolution: ${finalWidth}x${finalHeight}")
-                        
+
                         result.success(outputPath)
                     }
 
@@ -207,6 +221,9 @@ class NativeVideoCompressPlugin : FlutterPlugin, MethodCallHandler {
                         exportResult: ExportResult,
                         exportException: ExportException
                     ) {
+                        // Stop progress polling
+                        progressRunnable?.let { progressHandler.removeCallbacks(it) }
+
                         Log.e("VideoCompress", "❌ 압축 실패", exportException)
                         result.error(
                             "COMPRESSION_ERROR",
@@ -220,9 +237,44 @@ class NativeVideoCompressPlugin : FlutterPlugin, MethodCallHandler {
             Log.d("VideoCompress", "🚀 Transformer Start...")
             transformer.start(editedMediaItem, outputPath)
 
+            // Setup and start progress polling
+            progressRunnable = object : Runnable {
+                override fun run() {
+                    when (transformer.getProgress(progressHolder)) {
+                        Transformer.PROGRESS_STATE_AVAILABLE -> {
+                            val progress = progressHolder.progress // 0-100
+                            sendProgressToFlutter(progress)
+                            progressHandler.postDelayed(this, 200) // Poll every 200ms
+                        }
+                        Transformer.PROGRESS_STATE_UNAVAILABLE -> {
+                            // Not started yet, keep polling
+                            progressHandler.postDelayed(this, 200)
+                        }
+                        Transformer.PROGRESS_STATE_NO_TRANSFORMATION -> {
+                            // No transformation needed (edge case)
+                            sendProgressToFlutter(100)
+                        }
+                        else -> {
+                            // Unknown state, keep polling
+                            progressHandler.postDelayed(this, 200)
+                        }
+                    }
+                }
+            }
+
+            // Start progress polling
+            progressRunnable?.let { progressHandler.post(it) }
+
         } catch (e: Exception) {
             Log.e("VideoCompress", "❌ 압축 설정 실패", e)
             result.error("COMPRESSION_ERROR", e.message ?: "Unknown error", e.toString())
+        }
+    }
+
+    // Send progress to Flutter
+    private fun sendProgressToFlutter(progress: Int) {
+        Handler(Looper.getMainLooper()).post {
+            channel.invokeMethod("onProgress", mapOf("progress" to progress))
         }
     }
 
