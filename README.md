@@ -31,6 +31,7 @@ Not supported: Web, macOS, Windows, Linux.
 - **Resize**: specify output `width`/`height` (defaults to original if omitted)
 - **Video codecs**: `h264`, `h265`/`hevc`
 - **Audio codecs/quality**: `aac`, `alac`, `mp3` with bitrate/sample rate/channels
+- **Realtime progress**: progress callback (0.0 → 1.0) while compressing
 - **Info logging**: print size, resolution, and duration before/after compression
 - **Temp file management**: result is written to the temporary directory; Function to clear cache
 
@@ -86,12 +87,18 @@ final output = await NativeVideoController.compressVideo(
   bitrate: 2_000_000, // 2 Mbps
   width: 1280,        // optional (Nullable)
   height: 720,        // optional (Nullable)
+  // Preserve original resolution when width/height are omitted (default: true)
+  preserveResolution: true,
+  // If compressed file becomes larger, keep original (default: true)
+  avoidLargerOutput: true,
   videoSetting: VideoSetting.h264, // h265/hevc also supported (Default)
   audioSetting: AudioSetting.aac,  // alac, mp3 also supported (Default)
   audioBitrate: 128000, // optional (Default)
   audioSampleRate: 44100, // optional (Default)
   audioChannels: 2, // optional (Default)
   printingInfo: false, // log info before/after
+  // Realtime progress callback: 0.0 ~ 1.0
+  onProgress: (p) => print('Progress: ${(p * 100).toStringAsFixed(0)}%'),
 );
 ```
 
@@ -107,6 +114,22 @@ await NativeVideoController.printVideoInfo("/path/to/input.mp4");
 
 ---
 
+## 📊 Realtime Progress
+- The `onProgress` callback receives a double in the range `0.0` to `1.0`.
+- Update frequency is throttled to about every 200ms.
+- Example:
+```dart
+await NativeVideoController.compressVideo(
+  inputPath: "/path/to/input.mp4",
+  bitrate: 1_000_000,
+  onProgress: (value) {
+    // Update your UI (progress bar) with value (0.0 ~ 1.0)
+  },
+);
+```
+
+---
+
 ## 🧩 Parameters
 
 | Parameter      | Type          | Default        | Description |
@@ -115,18 +138,35 @@ await NativeVideoController.printVideoInfo("/path/to/input.mp4");
 | bitrate        | int           | 2,000,000      | Average video bitrate in bps. |
 | width          | int?          | null           | Output width; keeps original if null. |
 | height         | int?          | null           | Output height; keeps original if null. |
+| preserveResolution | bool      | true           | When `width/height` are omitted, preserve original resolution (Android). If false, encoder-aligned size may be applied. |
+| avoidLargerOutput | bool       | true           | If compressed output becomes larger than input, keep the original instead (Android). |
 | videoSetting   | VideoSetting  | h264           | Video codec. Allowed: h264, h265, hevc. |
 | audioSetting   | AudioSetting  | aac            | Audio codec. Allowed: aac (lossy), alac (lossless), mp3 (lossy). |
 | audioBitrate   | int           | 128,000        | Audio bitrate in bps. |
 | audioSampleRate| int           | 44,100         | Audio sample rate in Hz. |
 | audioChannels  | int           | 2              | Number of channels (1=mono, 2=stereo). |
 | printingInfo   | bool          | false          | Print size/resolution/duration before/after. |
+| onProgress     | Function(double) | null        | Realtime progress callback (0.0 → 1.0). |
 | outputPath     | String        | temp/compressed.mp4 | Auto-generated in temporary directory; not a function parameter, returned path may be copied/moved as needed. |
 
 ### Enums
 ```dart
 enum VideoSetting { h264('h264', 'H.264/AVC'), h265('h265', 'H.265/HEVC'), hevc('hevc', 'H.265/HEVC') }
 enum AudioSetting { aac('aac', false), alac('alac', true), mp3('mp3', false) }
+```
+
+---
+
+## 📉 Compression Stats (Optional)
+You can compute the compression ratio after compression using paths:
+```dart
+final stats = await NativeVideoController.calculateCompressionStats(
+  inputPath: "/path/to/input.mp4",
+  outputPath: output!, // from compressVideo
+);
+print('Compression: ${stats.ratioPercent.toStringAsFixed(1)}% '
+      '(in: ${(stats.inputBytes/1024/1024).toStringAsFixed(2)}MB '
+      '→ out: ${(stats.outputBytes/1024/1024).toStringAsFixed(2)}MB)');
 ```
 
 ---
@@ -146,12 +186,14 @@ await NativeVideoController.clearCache();
 
 ## Platform Notes
 - **Android**
-  - If the compressed file becomes larger than the input, the plugin returns the original by copying it to the output path.
-  - Resolution is rounded to a multiple of 16 internally (encoder constraints).
+  - Realtime progress is supported.
+  - If `avoidLargerOutput` is true (default), and the compressed file becomes larger than the input, the plugin returns the original by copying it to the output path.
+  - By default (`preserveResolution=true`) no scaling is applied when `width/height` are omitted. When resizing or if `preserveResolution=false`, dimensions are aligned to even numbers (multiples of 2) for encoder compatibility.
   - `h265`/`hevc` requires a supported device encoder; otherwise it may fail.
   - Lowering bitrate without resizing may have limited effect; consider setting `width/height` as well.
 
 - **iOS**
+  - Realtime progress is supported.
   - Handles rotation (preferred transform) to preserve the correct orientation.
   - `h265`/`hevc` requires HEVC support on the device/OS.
   - `alac` is lossless.
@@ -160,8 +202,7 @@ await NativeVideoController.clearCache();
 
 ## 👀 Example App
 See the `example/` project in this repository.
-- Page: `example/lib/page/native_video_compress_page.dart`
-- Player widget: `example/lib/component/video_file_widget.dart`
+- Page: `example/lib/main.dart`
 
 Notes:
 - The example uses `image_picker` purely to demonstrate selecting a video file. The plugin itself does not depend on it.

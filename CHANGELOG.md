@@ -16,3 +16,11 @@
 
 ## 0.0.3
 - Implementing by integrating example code into the main.dart
+
+## 0.0.4
+- Add realtime progress callback (0.0 → 1.0) via `onProgress` parameter
+- Android: add `preserveResolution` (default: true) — when `width/height` are omitted, no scaling is applied
+- Android: add `avoidLargerOutput` (default: true) — if output gets larger, keep original instead
+- Android: when resizing (or preserveResolution=false), align dimensions to even numbers (×2) for encoder compatibility
+- Docs: README updated with progress usage, parameters table, platform notes
+- Dart: expose `calculateCompressionStats` helper to compute the compression ratio
