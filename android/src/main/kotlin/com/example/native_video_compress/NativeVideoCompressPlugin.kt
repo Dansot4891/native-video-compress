@@ -56,6 +56,8 @@ class NativeVideoCompressPlugin : FlutterPlugin, MethodCallHandler {
                 val audioBitrate = call.argument<Int>("audioBitrate") ?: 128_000
                 val audioSampleRate = call.argument<Int>("audioSampleRate") ?: 44_100
                 val audioChannels = call.argument<Int>("audioChannels") ?: 2
+                val preserveResolution = call.argument<Boolean>("preserveResolution") ?: true
+                val avoidLargerOutput = call.argument<Boolean>("avoidLargerOutput") ?: true
 
                 compressVideo(
                     inputPath = inputPath,
@@ -68,6 +70,8 @@ class NativeVideoCompressPlugin : FlutterPlugin, MethodCallHandler {
                     audioBitrate = audioBitrate,
                     audioSampleRate = audioSampleRate,
                     audioChannels = audioChannels,
+                    preserveResolution = preserveResolution,
+                    avoidLargerOutput = avoidLargerOutput,
                     result = result
                 )
             }
@@ -88,6 +92,8 @@ class NativeVideoCompressPlugin : FlutterPlugin, MethodCallHandler {
         audioBitrate: Int,
         audioSampleRate: Int,
         audioChannels: Int,
+        preserveResolution: Boolean,
+        avoidLargerOutput: Boolean,
         result: Result
     ) {
         Log.d("VideoCompress", "========== Compress Start ==========")
@@ -111,19 +117,24 @@ class NativeVideoCompressPlugin : FlutterPlugin, MethodCallHandler {
             Log.d("VideoCompress", "📹 Original Size: ${originalWidth}x${originalHeight}, ${originalBitrate / 1000}kbps")
 
             // 해상도 결정 - 사용자 지정이 없으면 원본 유지
-            val finalWidth: Int
-            val finalHeight: Int
+            val finalWidth: Int?
+            val finalHeight: Int?
 
             if (width != null && height != null) {
-                // 사용자가 명시적으로 해상도 지정
-                finalWidth = roundTo16(width)
-                finalHeight = roundTo16(height)
+                // 사용자가 명시적으로 해상도 지정 → 최소 제약(2의 배수)만 적용
+                finalWidth = roundTo2(width)
+                finalHeight = roundTo2(height)
                 Log.d("VideoCompress", "🎯 Custom Resolution: ${finalWidth}x${finalHeight}")
+            } else if (preserveResolution) {
+                // 원본 해상도 유지 (효과 제거)
+                finalWidth = null
+                finalHeight = null
+                Log.d("VideoCompress", "🎯 Preserve original resolution (no scaling)")
             } else {
-                // 해상도 지정 없으면 원본 그대로
-                finalWidth = roundTo16(originalWidth)
-                finalHeight = roundTo16(originalHeight)
-                Log.d("VideoCompress", "🎯 Original resolution: ${finalWidth}x${finalHeight}")
+                // 보수적으로 원본 유지하되 인코더 호환을 위해 2의 배수 보정
+                finalWidth = roundTo2(originalWidth)
+                finalHeight = roundTo2(originalHeight)
+                Log.d("VideoCompress", "🎯 Keep original (2x aligned): ${finalWidth}x${finalHeight}")
             }
 
             // 비트레이트가 원본보다 낮은데 해상도는 그대로면 경고
@@ -153,16 +164,21 @@ class NativeVideoCompressPlugin : FlutterPlugin, MethodCallHandler {
 
             val mediaItem = MediaItem.fromUri(inputPath)
 
-            val effects = Effects(
-                emptyList(),
-                listOf(
-                    Presentation.createForWidthAndHeight(
-                        finalWidth,
-                        finalHeight,
-                        Presentation.LAYOUT_SCALE_TO_FIT
+            val effects = if (finalWidth != null && finalHeight != null) {
+                Effects(
+                    emptyList(),
+                    listOf(
+                        Presentation.createForWidthAndHeight(
+                            finalWidth,
+                            finalHeight,
+                            Presentation.LAYOUT_SCALE_TO_FIT
+                        )
                     )
                 )
-            )
+            } else {
+                // 해상도 변경 없음
+                Effects(emptyList(), emptyList())
+            }
 
             val editedMediaItem = EditedMediaItem.Builder(mediaItem)
                 .setEffects(effects)
@@ -188,8 +204,8 @@ class NativeVideoCompressPlugin : FlutterPlugin, MethodCallHandler {
                         val inputSize = File(inputPath).length()
                         val outputSize = File(outputPath).length()
 
-                        // 압축했는데 원본보다 크면 원본 사용
-                        if (outputSize >= inputSize) {
+                        // 옵션: 압축했는데 원본보다 크면 원본 사용
+                        if (avoidLargerOutput && outputSize >= inputSize) {
                             Log.w("VideoCompress", "⚠️ Files get bigger after compression → Using the Original Source ⚠️")
 
                             // 압축된 파일 삭제
@@ -281,5 +297,9 @@ class NativeVideoCompressPlugin : FlutterPlugin, MethodCallHandler {
     // 16의 배수로 반올림하는 함수
     private fun roundTo16(value: Int): Int {
         return (value + 8) / 16 * 16
+    }
+    // 2의 배수로 반올림하는 함수
+    private fun roundTo2(value: Int): Int {
+        return if (value % 2 == 0) value else value + 1
     }
 }
