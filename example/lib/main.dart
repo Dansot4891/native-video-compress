@@ -43,12 +43,16 @@ class _NativeVideoCompressPageState extends State<NativeVideoCompressPage> {
   String? path;
   String? outputPath;
   final picker = ImagePicker();
+  double? _progress; // 0.0 ~ 1.0
+  String? _ratioText;
 
   void _selectVideo() async {
     final result = await picker.pickVideo(source: ImageSource.gallery);
     if (result != null) {
       setState(() {
         path = result.path;
+        _progress = null;
+        _ratioText = null;
       });
       debugPrint('path: $path');
     }
@@ -68,16 +72,74 @@ class _NativeVideoCompressPageState extends State<NativeVideoCompressPage> {
               ),
               if (path != null) VideoFileWidget(videoPath: path!),
               if (outputPath != null) VideoFileWidget(videoPath: outputPath!),
+              if (_progress != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      LinearProgressIndicator(
+                        value: _progress!.clamp(0.0, 1.0),
+                        minHeight: 10,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Progress: ${((_progress ?? 0) * 100).toStringAsFixed(0)}%',
+                      ),
+                    ],
+                  ),
+                ),
+              if (_ratioText != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
+                  child: Text(
+                    _ratioText!,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
               ElevatedButton(
                 onPressed: () async {
+                  if (path == null) return;
+                  setState(() {
+                    _progress = 0.0;
+                    _ratioText = null;
+                    outputPath = null;
+                  });
                   final result = await NativeVideoController.compressVideo(
                     inputPath: path!,
                     bitrate: 1000000,
                     printingInfo: true,
+                    onProgress: (p) {
+                      if (!mounted) return;
+                      setState(() {
+                        _progress = p;
+                      });
+                    },
                   );
-                  setState(() {
-                    outputPath = result;
-                  });
+                  if (!mounted) return;
+                  if (result != null) {
+                    final stats =
+                        await NativeVideoController.calculateCompressionStats(
+                          inputPath: path!,
+                          outputPath: result,
+                        );
+                    setState(() {
+                      outputPath = result;
+                      _ratioText =
+                          'Compression: ${stats.ratioPercent.toStringAsFixed(1)}% (in: ${(stats.inputBytes / 1024 / 1024).toStringAsFixed(2)}MB → out: ${(stats.outputBytes / 1024 / 1024).toStringAsFixed(2)}MB)';
+                      _progress = 1.0;
+                    });
+                  } else {
+                    setState(() {
+                      _progress = null;
+                    });
+                  }
                 },
                 child: Text('Compress Video'),
               ),

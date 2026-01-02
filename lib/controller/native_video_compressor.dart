@@ -9,6 +9,35 @@ import 'package:video_player/video_player.dart';
 abstract class NativeVideoController {
   static const MethodChannel _channel = MethodChannel('native_video_compress');
 
+  /// Compression statistics
+  static CompressionStats _buildStats(int inputBytes, int outputBytes) {
+    final ratio = inputBytes > 0
+        ? ((inputBytes - outputBytes) / inputBytes) * 100.0
+        : 0.0;
+    return CompressionStats(
+      inputBytes: inputBytes,
+      outputBytes: outputBytes,
+      ratioPercent: ratio.clamp(-100.0, 100.0),
+    );
+  }
+
+  /// Calculate compression stats from file paths
+  static Future<CompressionStats> calculateCompressionStats({
+    required String inputPath,
+    required String outputPath,
+  }) async {
+    final inputFile = File(inputPath);
+    final outputFile = File(outputPath);
+    final inputExists = await inputFile.exists();
+    final outputExists = await outputFile.exists();
+    if (!inputExists || !outputExists) {
+      return _buildStats(0, 0);
+    }
+    final inputSize = await inputFile.length();
+    final outputSize = await outputFile.length();
+    return _buildStats(inputSize, outputSize);
+  }
+
   // Progress callback storage
   static Function(double)? _currentProgressCallback;
   static bool _handlerSetup = false;
@@ -144,4 +173,16 @@ abstract class NativeVideoController {
       await controller.dispose();
     }
   }
+}
+
+class CompressionStats {
+  final int inputBytes;
+  final int outputBytes;
+  final double ratioPercent;
+
+  const CompressionStats({
+    required this.inputBytes,
+    required this.outputBytes,
+    required this.ratioPercent,
+  });
 }
